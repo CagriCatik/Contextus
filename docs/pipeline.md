@@ -29,7 +29,8 @@ operators can reason about throughput, latency, and potential scaling strategies
    remaining budget emphasises relevant passages.
 4. **Context assembly** – `ContextBuilder.build_context()` concatenates formatted blocks with configurable separators.
    Character budgets (`max_context_chars`) and token budgets (`max_context_tokens` with an optional `token_overhead`) prevent
-   overruns while still allowing partial chunks when the final block would otherwise overflow.
+   overruns while still allowing partial chunks when the final block would otherwise overflow. When persistent memory is enabled,
+   retrieval only consumes the budget that remains after memory snippets are injected.
 
 ## 3. Generation Phase
 
@@ -40,6 +41,15 @@ operators can reason about throughput, latency, and potential scaling strategies
    and OpenAI clients both expose `list_models()`, `ensure_model()`, and `chat()`.
 3. **Response handling** – Rich console renderers display Markdown answers in the CLI. Downstream integrations (e.g. documentation
    generation) can reuse the same `ChatSession` mechanics to guarantee consistent prompt formatting.
+
+## 4. Persistent Memory Phase
+
+1. **Semantic cache check** – `ConversationMemory.maybe_answer()` probes the memory index for high-similarity matches. If the
+   best score meets or exceeds `memory.cache_min_score`, the stored answer is returned immediately.
+2. **Memory context budgeting** – `ConversationMemory.build_memory_context()` assembles a rolling summary and top episodic
+   memories while staying within `memory.max_memory_tokens` and `memory.max_memory_items`.
+3. **Turn persistence** – `ConversationMemory.remember()` appends the interaction to an on-disk log, refreshes the summary
+   (bounded by `memory.summary_tokens`), and writes new vectors to the FAISS memory index unless the answer came from cache.
 
 ## Latency and Throughput Considerations
 
@@ -58,8 +68,8 @@ operators can reason about throughput, latency, and potential scaling strategies
   fallback) to keep contexts within provider limits. Reserve space for prompts and user text via `retrieval.token_overhead`.
 - **Summarisation fallback** – When contexts exceed provider limits, fall back to summarising low-ranked chunks before appending
   them, or use a two-pass retrieval (coarse recall, rerank, summarise) to stay within window constraints.
-- **Conversation memory** – The CLI is stateless per turn. To support multi-turn chats, persist previous Q&A pairs and feed them
-  back through a secondary summarisation chain to avoid unbounded token growth.
+- **Persistent memory** – `ConversationMemory` maintains a semantic cache and rolling summary. Adjust `memory.max_memory_tokens`,
+  `memory.max_memory_items`, and cache thresholds to balance recall quality against latency.
 
 ## Observability Hooks
 

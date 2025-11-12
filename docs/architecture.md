@@ -20,6 +20,7 @@ flowchart LR
         embed[embedding.EmbeddingBackend]
         store[store.VectorStore]
         retrieve[retrieval.ContextBuilder]
+        memory[memory.ConversationMemory]
         chat[chat.ChatSession]
         docgen[docgen.TestSpecGenerator]
     end
@@ -36,6 +37,9 @@ flowchart LR
     chatCLI --> retrieve
     chatCLI --> chat
     chat --> retrieve
+    chat --> memory
+    memory --> store
+    store --> memory
     chat --> Providers
     docCLI --> docgen
     docgen --> retrieve
@@ -52,7 +56,8 @@ workflows remain provider-agnostic.
 ## Configuration System
 
 Configuration is centralised in `ragstack/config.py`, which exposes dataclasses for corpus discovery, embeddings,
-chunking, retrieval, vector store selection, provider credentials, prompts, and documentation settings. `AppConfig.load()`
+chunking, retrieval, vector store selection, persistent memory, provider credentials, prompts, and documentation settings.
+`AppConfig.load()`
 performs the following merge order:
 
 1. Defaults baked into the dataclasses.
@@ -134,25 +139,49 @@ same indexed corpus.
 - **Task Profiles:** Profiles targeting long-form answers can increase `retrieval.top_k`, `max_context_chars`, or token budgets
   to push more evidence into prompts.
 
+## Persistent Memory Layer
+
+`ConversationMemory` (in `ragstack/memory.py`) augments retrieval with long-term recall and summarisation:
+
+- **Episodic store:** Every `(query, answer)` pair is embedded with the configured `EmbeddingBackend` and written to a dedicated
+  FAISS index identified by `MemoryConfig.index_name`.
+- **Rolling summary:** A Markdown digest constrained by `memory.summary_tokens` keeps the most recent
+  `memory.rolling_window` turns available across sessions, persisted next to the memory index.
+- **Semantic cache:** When similarity exceeds `memory.cache_min_score` the stored answer is reused, bypassing the LLM while
+  logging the turn as `Origin: cached` for auditing.
+- **Budget sharing:** `ConversationMemory.build_memory_context()` consumes a configurable token/character budget before handing
+  the remaining allowance to `ContextBuilder`, preventing prompt overflows.
+
+Memory artefacts (`*_memory_context.faiss`, summary JSON, and append-only logs) live under `config.paths.index_dir`. Behaviour is
+controlled via YAML, environment variables (`MEMORY_*`), or CLI flags such as `--enable-memory`, `--memory-max-tokens`, and
+`--memory-top-k`.
+
 ## Chat Session Orchestration
 
 `ChatSession` coordinates retrieval and provider interaction:
 
 1. `ensure_model()` fetches the available models from the provider and prompts the user (via Rich tables or automatic selection
    in non-interactive shells) to choose one if not already configured.
-2. Each user query triggers `ContextBuilder.build_context()` to gather relevant chunks.
-3. The session materialises chat messages from `PromptConfig` templates and calls `client.chat()` on the configured provider.
-4. Responses are rendered using Rich Markdown panels for a polished console experience.
+2. `ConversationMemory` checks for a high-confidence match and can return cached answers immediately.
+3. Otherwise, `ConversationMemory.build_memory_context()` contributes persistent summaries and episodic memories.
+4. `ContextBuilder.build_context()` fills the remaining budget with document chunks.
+5. The session materialises chat messages from `PromptConfig` templates and calls `client.chat()` on the configured provider.
+6. Responses render via Rich Markdown panels, are persisted into the memory index, and rolled into the summary/log files.
 
 ```mermaid
 sequenceDiagram
     participant User
     participant Chat as ChatSession
+    participant Memory as ConversationMemory
     participant Ctx as ContextBuilder
     participant Store as VectorStore
     participant Model as Provider Client
 
     User->>Chat: input question
+    Chat->>Memory: maybe_answer(query)
+    Memory-->>Chat: cached answer?
+    Chat->>Memory: build_memory_context(query)
+    Memory-->>Chat: memory block
     Chat->>Ctx: build_context(query)
     Ctx->>Ctx: embed_query(query)
     Ctx->>Store: search(vector, top_k)

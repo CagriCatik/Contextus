@@ -18,6 +18,7 @@ from ragstack.llm import ModelClientError, ModelNotFoundError
 from ragstack.ollama import OllamaClient
 from ragstack.openai_client import OpenAIClient
 from ragstack.retrieval import ContextBuilder
+from ragstack.memory import ConversationMemory
 from ragstack.store import create_vector_store
 
 LOGGER = get_logger(__name__)
@@ -89,6 +90,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--index-dir", type=Path, help="Directory containing the FAISS index files.")
     parser.add_argument("--index-name", default="markdown_rag", help="Name of the FAISS index to query.")
     parser.add_argument("--log-level", default="INFO", help="Python logging level (default: INFO).")
+    parser.add_argument("--enable-memory", action="store_true", help="Force-enable persistent memory.")
+    parser.add_argument("--disable-memory", action="store_true", help="Disable persistent memory even if configured.")
+    parser.add_argument("--memory-top-k", type=int, help="Number of memory entries to search for each query.")
+    parser.add_argument("--memory-max-items", type=int, help="Maximum number of memory snippets to include per query.")
+    parser.add_argument("--memory-max-tokens", type=int, help="Token budget reserved for memory context.")
+    parser.add_argument(
+        "--memory-summary-tokens",
+        type=int,
+        help="Token budget for the rolling memory summary.",
+    )
+    parser.add_argument(
+        "--memory-min-score",
+        type=float,
+        help="Minimum similarity score required for a memory recall entry.",
+    )
+    parser.add_argument(
+        "--memory-cache-threshold",
+        type=float,
+        help="Score threshold for reusing an answer from the semantic memory cache.",
+    )
     return parser.parse_args()
 
 
@@ -118,6 +139,22 @@ def apply_overrides(config: AppConfig, args: argparse.Namespace) -> None:
     if args.index_dir:
         config.paths.index_dir = args.index_dir.resolve()
         config.paths.index_dir.mkdir(parents=True, exist_ok=True)
+    if args.enable_memory:
+        config.memory.enabled = True
+    if args.disable_memory:
+        config.memory.enabled = False
+    if args.memory_top_k is not None:
+        config.memory.search_top_k = args.memory_top_k
+    if args.memory_max_items is not None:
+        config.memory.max_memory_items = args.memory_max_items
+    if args.memory_max_tokens is not None:
+        config.memory.max_memory_tokens = args.memory_max_tokens
+    if args.memory_summary_tokens is not None:
+        config.memory.summary_tokens = args.memory_summary_tokens
+    if args.memory_min_score is not None:
+        config.memory.min_score = args.memory_min_score
+    if args.memory_cache_threshold is not None:
+        config.memory.cache_min_score = args.memory_cache_threshold
 
 
 def build_session(config: AppConfig, args: argparse.Namespace) -> ChatSession:
@@ -137,8 +174,18 @@ def build_session(config: AppConfig, args: argparse.Namespace) -> ChatSession:
         ) from exc
 
     context_builder = ContextBuilder(embeddings, store, retrieval_cfg)
+    memory = ConversationMemory(config, embeddings, retrieval_cfg) if config.memory.enabled else None
+    if memory:
+        memory.prune_cache()
     client, provider_name = build_client(config, args)
-    return ChatSession(client, context_builder, retrieval_cfg, prompt_cfg, provider_name)
+    return ChatSession(
+        client,
+        context_builder,
+        retrieval_cfg,
+        prompt_cfg,
+        provider_name,
+        memory=memory,
+    )
 
 
 def build_client(config: AppConfig, args: argparse.Namespace):

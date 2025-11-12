@@ -19,6 +19,7 @@ reference explains each section, environment overrides, and task profile usage.
 | `chunking` | `max_chars`, `min_chars`, `overlap` | Character-based windowing parameters for document chunking. |
 | `retrieval` | `top_k`, `max_context_chars`, `max_context_tokens`, `token_encoder`, `token_overhead`, `min_score`, `rerank_top_k` | Retrieval depth plus the budgets and filters applied when assembling the prompt context. |
 | `vector_store` | `backend`, `parameters` | Vector store backend (default FAISS). Extra parameters are forwarded to the backend constructor. |
+| `memory` | `enabled`, `index_name`, `search_top_k`, `max_memory_items`, `max_memory_tokens`, `summary_tokens`, `cache_min_score`, `rolling_window` | Persistent conversational memory configuration and semantic cache thresholds. |
 | `ollama` | `host`, `timeout` | Connection details for the Ollama HTTP API. |
 | `openai` | `api_key`, `model`, `base_url`, `organization` | OpenAI client settings. `api_key` can be omitted in YAML and provided via environment variables. |
 | `llm` | `provider`, `default_model` | Default chat provider and model name. |
@@ -33,6 +34,7 @@ Set any of the following environment variables (directly or via `.env`) to overr
 - `EMBEDDING_MODEL_NAME`, `EMBEDDING_DEVICE`
 - `MAX_CHARS_PER_CHUNK`, `MIN_CHARS_PER_CHUNK`, `CHUNK_OVERLAP`
 - `RAG_TOP_K`, `RAG_MAX_CONTEXT_CHARS`, `RAG_MAX_CONTEXT_TOKENS`, `RAG_TOKEN_ENCODER`, `RAG_FALLBACK_CHARS_PER_TOKEN`, `RAG_TOKEN_OVERHEAD`, `RAG_MIN_SCORE`, `RAG_RERANK_TOP_K`, `RAG_CONTEXT_SEPARATOR`
+- `MEMORY_ENABLED`, `MEMORY_INDEX_NAME`, `MEMORY_TOP_K`, `MEMORY_MAX_ITEMS`, `MEMORY_MAX_TOKENS`, `MEMORY_SUMMARY_TOKENS`, `MEMORY_MIN_SCORE`, `MEMORY_CACHE_MIN_SCORE`, `MEMORY_CACHE_TTL_MINUTES`, `MEMORY_TOKEN_ENCODER`, `MEMORY_FALLBACK_CHARS_PER_TOKEN`
 - `VECTOR_STORE_BACKEND`
 - `OLLAMA_HOST`, `OLLAMA_TIMEOUT`
 - `LLM_PROVIDER`, `LLM_MODEL`

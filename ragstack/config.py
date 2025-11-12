@@ -112,6 +112,28 @@ class RetrievalConfig:
 
 
 @dataclass
+class MemoryConfig:
+    """Persistent conversational memory and semantic cache settings."""
+
+    enabled: bool = False
+    index_name: str = "memory_context"
+    search_top_k: int = 12
+    max_memory_items: int = 6
+    max_memory_tokens: int | None = 512
+    summary_tokens: int | None = 256
+    summary_max_chars: int = 1500
+    token_encoder: str | None = None
+    fallback_chars_per_token: float = 4.0
+    min_score: float | None = 0.25
+    cache_enabled: bool = True
+    cache_min_score: float = 0.88
+    cache_ttl_minutes: int = 1440
+    rolling_window: int = 20
+    summary_path: str | None = None
+    log_path: str | None = None
+
+
+@dataclass
 class VectorStoreConfig:
     """Backend selection and parameters for the vector store layer."""
 
@@ -183,6 +205,7 @@ class AppConfig:
     chunking: ChunkingConfig = field(default_factory=ChunkingConfig)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
     vector_store: VectorStoreConfig = field(default_factory=VectorStoreConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
     ollama: OllamaConfig = field(default_factory=OllamaConfig)
     openai: OpenAIConfig = field(default_factory=OpenAIConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
@@ -239,6 +262,8 @@ class AppConfig:
             _update_dataclass(self.retrieval, payload["retrieval"])
         if "vector_store" in payload:
             _update_dataclass(self.vector_store, payload["vector_store"])
+        if "memory" in payload:
+            _update_dataclass(self.memory, payload["memory"])
         if "ollama" in payload:
             _update_dataclass(self.ollama, payload["ollama"])
         if "openai" in payload:
@@ -319,6 +344,52 @@ class AppConfig:
         vector_backend = _env("VECTOR_STORE_BACKEND")
         if vector_backend:
             self.vector_store.backend = vector_backend
+
+        memory_enabled = _env("MEMORY_ENABLED")
+        if memory_enabled is not None:
+            self.memory.enabled = memory_enabled.lower() in {"1", "true", "yes", "on"}
+        memory_index = _env("MEMORY_INDEX_NAME")
+        if memory_index:
+            self.memory.index_name = memory_index
+        memory_top_k = _env("MEMORY_TOP_K")
+        if memory_top_k:
+            self.memory.search_top_k = int(memory_top_k)
+        memory_max_items = _env("MEMORY_MAX_ITEMS")
+        if memory_max_items:
+            self.memory.max_memory_items = int(memory_max_items)
+        memory_max_tokens = _env("MEMORY_MAX_TOKENS")
+        if memory_max_tokens:
+            self.memory.max_memory_tokens = int(memory_max_tokens)
+        memory_summary_tokens = _env("MEMORY_SUMMARY_TOKENS")
+        if memory_summary_tokens:
+            self.memory.summary_tokens = int(memory_summary_tokens)
+        memory_token_encoder = _env("MEMORY_TOKEN_ENCODER")
+        if memory_token_encoder:
+            self.memory.token_encoder = memory_token_encoder
+        memory_fallback_ratio = _env("MEMORY_FALLBACK_CHARS_PER_TOKEN")
+        if memory_fallback_ratio:
+            self.memory.fallback_chars_per_token = float(memory_fallback_ratio)
+        memory_min_score = _env("MEMORY_MIN_SCORE")
+        if memory_min_score:
+            self.memory.min_score = float(memory_min_score)
+        memory_cache = _env("MEMORY_CACHE_ENABLED")
+        if memory_cache is not None:
+            self.memory.cache_enabled = memory_cache.lower() in {"1", "true", "yes", "on"}
+        memory_cache_threshold = _env("MEMORY_CACHE_MIN_SCORE")
+        if memory_cache_threshold:
+            self.memory.cache_min_score = float(memory_cache_threshold)
+        memory_cache_ttl = _env("MEMORY_CACHE_TTL_MINUTES")
+        if memory_cache_ttl:
+            self.memory.cache_ttl_minutes = int(memory_cache_ttl)
+        memory_window = _env("MEMORY_ROLLING_WINDOW")
+        if memory_window:
+            self.memory.rolling_window = int(memory_window)
+        memory_summary_path = _env("MEMORY_SUMMARY_PATH")
+        if memory_summary_path:
+            self.memory.summary_path = memory_summary_path
+        memory_log_path = _env("MEMORY_LOG_PATH")
+        if memory_log_path:
+            self.memory.log_path = memory_log_path
 
         openai_key = _env("OPENAI_API_KEY")
         if openai_key:

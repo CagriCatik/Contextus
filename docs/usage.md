@@ -35,6 +35,10 @@ Additional tips:
   answer quality while staying under provider limits.
 - Combine `--token-encoder` with `--max-context-tokens` when working with hosted models that expose strict token windows.
 - Use `--min-score` and `--rerank-top-k` to filter noisy matches and prioritise high-confidence evidence at query time.
+- Enable long-term recall with `--enable-memory` (default: on). Tune `--memory-max-tokens`, `--memory-top-k`,
+  `--memory-max-items`, and `--memory-cache-threshold` to balance context reuse against latency.
+- Memory artefacts (`index/memory_context*.faiss`, summary/log JSON) persist across sessions. Remove them if you need a clean
+  slate or when rotating sensitive knowledge.
 
 ## 4. Generate Documentation
 
@@ -54,6 +58,8 @@ The generator shares the same retrieval pipeline as chat, ensuring consistent gr
   raising `--min-score`, increasing `--rerank-top-k`, re-ingesting with larger `max_chars`, or upgrading the embedding model.
 - **Latency spikes:** Check whether embedding device auto-detection fell back to CPU; specify `--embedding-device cuda` when
   GPUs are available.
+- **Stale memory entries:** Delete `index/memory_context*.faiss` and the accompanying JSON files to rebuild the memory index or
+  adjust `memory.cache_min_score`/`memory.cache_ttl_minutes` in `config.yaml` to tighten reuse.
 
 ## 6. Extending the Stack
 

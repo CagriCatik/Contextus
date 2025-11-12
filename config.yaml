@@ -31,6 +31,18 @@ vector_store:
   backend: faiss
   parameters: {}
 
+memory:
+  enabled: true
+  index_name: memory_context
+  search_top_k: 12
+  max_memory_items: 6
+  max_memory_tokens: 512
+  summary_tokens: 256
+  min_score: 0.25
+  cache_min_score: 0.9
+  cache_ttl_minutes: 1440
+  rolling_window: 20
+
 llm:
   provider: ollama
   default_model: llama3.2:latest

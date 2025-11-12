@@ -38,6 +38,7 @@ from .openai_client import (
 )
 from .pipeline import IndexBuilder, IngestionStats
 from .retrieval import ContextBuilder
+from .memory import ConversationMemory
 from .store import (
     FaissVectorStore,
     VectorRecord,
@@ -90,6 +91,7 @@ __all__ = [
     "create_vector_store",
     "register_vector_store",
     "ContextBuilder",
+    "ConversationMemory",
     "ChatSession",
     "TestCase",
     "TestSpecGenerator",

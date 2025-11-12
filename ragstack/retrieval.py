@@ -68,12 +68,19 @@ class ContextBuilder:
 
         return chunks[:requested_k]
 
-    def build_context(self, query: str, *, max_chars: int | None = None, top_k: int | None = None) -> str:
+    def build_context(
+        self,
+        query: str,
+        *,
+        max_chars: int | None = None,
+        max_tokens: int | None = None,
+        top_k: int | None = None,
+    ) -> str:
         config = self.retrieval
         max_chars = config.max_context_chars if max_chars is None else max_chars
         if max_chars is not None and max_chars <= 0:
             max_chars = None
-        token_budget = config.max_context_tokens
+        token_budget = config.max_context_tokens if max_tokens is None else max_tokens
         if token_budget is not None:
             token_budget = max(0, token_budget - config.token_overhead)
             if token_budget == 0:

@@ -18,10 +18,11 @@ It separates the workflow into:
 1. **Ingestion** – use [MarkItDown](https://github.com/openai/markitdown) to normalise
    heterogeneous documents to Markdown/plain text, split them into overlapping chunks,
    embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.
-2. **Retrieval** – efficiently locate the most relevant chunks for a user question with score-aware reranking and token budgeting.
+2. **Retrieval** – efficiently locate the most relevant chunks for a user question with score-aware reranking, adaptive token budgeting, and configurable similarity thresholds.
 3. **Generation** – call either a locally hosted [Ollama](https://ollama.com) model or an
    [OpenAI](https://platform.openai.com) chat model with the retrieved context to produce
    grounded answers.
+4. **Memory orchestration** – persist multi-session conversations in a semantic vector index, summarise long-term context, and reuse high-confidence answers through a semantic cache.
 
 All moving pieces live in the `ragstack/` package so configuration, ingestion, and chat
 experiences stay modular and testable.
@@ -105,6 +106,13 @@ retrieval:
   token_overhead: 200
   min_score: 0.2
   rerank_top_k: 8
+memory:
+  enabled: true
+  max_memory_tokens: 512
+  summary_tokens: 256
+  search_top_k: 12
+  max_memory_items: 6
+  cache_min_score: 0.9
 llm:
   provider: ollama
   default_model: llama3.2:latest
@@ -147,6 +155,15 @@ Key overrides and their environment variables:
 | `retrieval.min_score` | `RAG_MIN_SCORE` | Discard retrieved chunks whose similarity falls below this threshold. |
 | `retrieval.rerank_top_k` | `RAG_RERANK_TOP_K` | Re-embed and rerank the top-N chunks for better precision. |
 | `retrieval.context_separator` | `RAG_CONTEXT_SEPARATOR` | Separator inserted between retrieved chunks. |
+| `memory.enabled` | `MEMORY_ENABLED` | Enable (`true`) or disable (`false`) persistent conversational memory. |
+| `memory.max_memory_tokens` | `MEMORY_MAX_TOKENS` | Token budget reserved for replaying persistent memory per query. |
+| `memory.summary_tokens` | `MEMORY_SUMMARY_TOKENS` | Token budget for the rolling long-term memory summary. |
+| `memory.search_top_k` | `MEMORY_TOP_K` | Maximum number of memory entries to retrieve before filtering. |
+| `memory.max_memory_items` | `MEMORY_MAX_ITEMS` | Cap on the number of memory snippets injected into the context. |
+| `memory.min_score` | `MEMORY_MIN_SCORE` | Filter out recalled memories whose similarity is below this threshold. |
+| `memory.cache_min_score` | `MEMORY_CACHE_MIN_SCORE` | Minimum score required to reuse an answer directly from the semantic cache. |
+| `memory.cache_ttl_minutes` | `MEMORY_CACHE_TTL_MINUTES` | Age (minutes) after which cached answers are pruned from the summary. |
+| `memory.token_encoder` | `MEMORY_TOKEN_ENCODER` | Override the tokenizer used when budgeting persistent memory tokens. |
 | `llm.provider` | `LLM_PROVIDER` | Choose `ollama` or `openai`. |
 | `llm.default_model` | `LLM_MODEL` | Default model to preselect for the chosen provider. |
 | `ollama.host` | `OLLAMA_HOST` | Base URL of the Ollama HTTP API. |
@@ -197,7 +214,31 @@ different `.env` via `--env-file`.
 
 ---
 
-## 5. Explore the index (optional)
+## 5. Persistent memory & adaptive context
+
+Contextus now keeps track of multi-session conversations alongside the document index:
+
+- **Vectorised episodic memory.** Each turn (`question → answer`) is embedded and stored in a
+  dedicated FAISS index (`index/memory_context.faiss`), enabling semantic recall of previous
+  exchanges alongside document retrieval.
+- **Rolling long-term summary.** A compact Markdown summary is updated after every response and
+  persisted to `index/memory_context_summary.json`, keeping the most recent `rolling_window`
+  turns within the configured token budget.
+- **Semantic answer cache.** High-confidence matches above `memory.cache_min_score` allow the
+  chat layer to reuse answers instantly, improving latency for repeated questions while still
+  logging the interaction (marked as `Origin: cached`).
+- **Adaptive budgeting.** Memory snippets consume a reserved token budget before handing the
+  remaining allowance to `ContextBuilder`, ensuring the prompt never exceeds the configured
+  context window.
+
+Tune the behaviour through `config.yaml` or CLI flags such as `--enable-memory`,
+`--memory-max-tokens`, `--memory-top-k`, `--memory-max-items`, and
+`--memory-cache-threshold`. Memory artefacts live next to the primary index and survive across
+chat sessions.
+
+---
+
+## 6. Explore the index (optional)
 
 Diagnostic scripts help verify the ingestion results:
 
@@ -218,7 +259,7 @@ locations with the same flags used by the main CLIs.
 
 ---
 
-## 6. Chat with your Knowledge Base
+## 7. Chat with your Knowledge Base
 
 **List models for the configured provider:**
 
@@ -268,7 +309,7 @@ $ python chat_cli.py --model llama3.2:latest
 ────────────── RAG chat session. Press Enter on an empty line or Ctrl+D to exit. ──────────────
 
 [prompt]You:[/prompt] What does the ingestion pipeline do?
-[info]Retrieving context from the vector store...[/info]
+[info]Preparing augmented context...[/info]
 [info]Calling ollama...[/info]
 
 ╭─ Assistant ─╮
@@ -278,12 +319,15 @@ $ python chat_cli.py --model llama3.2:latest
 ╰─────────────╯
 ```
 
+Follow-up questions that cross the `memory.cache_min_score` threshold are served instantly
+from persistent memory and labelled with a `Memory Hit` panel.
+
 Provider errors (missing models, authentication problems, connectivity) are surfaced as
 actionable messages instead of raw stack traces.
 
 ---
 
-## 7. Custom prompts, embeddings, and chunking strategies
+## 8. Custom prompts, embeddings, and chunking strategies
 
 - **Chunking:** adjust `max_chars`, `min_chars`, and `overlap` in `config.yaml` (or via
   environment variables) to match the structure of your documents. Shorter chunks with more
