@@ -67,6 +67,25 @@ def parse_args() -> argparse.Namespace:
         type=int,
         help="Maximum character budget for the context block.",
     )
+    parser.add_argument(
+        "--max-context-tokens",
+        type=int,
+        help="Maximum token budget for the context block (post-separator).",
+    )
+    parser.add_argument(
+        "--token-encoder",
+        help="Tokenizer identifier used for estimating context tokens (e.g. cl100k_base).",
+    )
+    parser.add_argument(
+        "--min-score",
+        type=float,
+        help="Minimum similarity score threshold for retrieved chunks.",
+    )
+    parser.add_argument(
+        "--rerank-top-k",
+        type=int,
+        help="Re-embed the top-N results and rerank them with the query embedding.",
+    )
     parser.add_argument("--index-dir", type=Path, help="Directory containing the FAISS index files.")
     parser.add_argument("--index-name", default="markdown_rag", help="Name of the FAISS index to query.")
     parser.add_argument("--log-level", default="INFO", help="Python logging level (default: INFO).")
@@ -88,6 +107,14 @@ def apply_overrides(config: AppConfig, args: argparse.Namespace) -> None:
         config.retrieval.top_k = args.top_k
     if args.max_context_chars:
         config.retrieval.max_context_chars = args.max_context_chars
+    if args.max_context_tokens is not None:
+        config.retrieval.max_context_tokens = args.max_context_tokens
+    if args.token_encoder:
+        config.retrieval.token_encoder = args.token_encoder
+    if args.min_score is not None:
+        config.retrieval.min_score = args.min_score
+    if args.rerank_top_k is not None:
+        config.retrieval.rerank_top_k = args.rerank_top_k
     if args.index_dir:
         config.paths.index_dir = args.index_dir.resolve()
         config.paths.index_dir.mkdir(parents=True, exist_ok=True)

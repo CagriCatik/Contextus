@@ -18,7 +18,7 @@ It separates the workflow into:
 1. **Ingestion** – use [MarkItDown](https://github.com/openai/markitdown) to normalise
    heterogeneous documents to Markdown/plain text, split them into overlapping chunks,
    embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.
-2. **Retrieval** – efficiently locate the most relevant chunks for a user question.
+2. **Retrieval** – efficiently locate the most relevant chunks for a user question with score-aware reranking and token budgeting.
 3. **Generation** – call either a locally hosted [Ollama](https://ollama.com) model or an
    [OpenAI](https://platform.openai.com) chat model with the retrieved context to produce
    grounded answers.
@@ -100,6 +100,11 @@ chunking:
 retrieval:
   top_k: 5
   max_context_chars: 4000
+  max_context_tokens: 1200
+  token_encoder: cl100k_base
+  token_overhead: 200
+  min_score: 0.2
+  rerank_top_k: 8
 llm:
   provider: ollama
   default_model: llama3.2:latest
@@ -135,6 +140,13 @@ Key overrides and their environment variables:
 | `chunking.overlap` | `CHUNK_OVERLAP` | Control how much neighbouring chunks overlap. |
 | `retrieval.top_k` | `RAG_TOP_K` | Number of chunks retrieved per query. |
 | `retrieval.max_context_chars` | `RAG_MAX_CONTEXT_CHARS` | Character budget for the concatenated context. |
+| `retrieval.max_context_tokens` | `RAG_MAX_CONTEXT_TOKENS` | Token budget (after subtracting `token_overhead`) used when building the context window. |
+| `retrieval.token_encoder` | `RAG_TOKEN_ENCODER` | Tokenizer identifier (e.g. `cl100k_base`, or an LLM name supported by tiktoken). |
+| `retrieval.fallback_chars_per_token` | `RAG_FALLBACK_CHARS_PER_TOKEN` | Character-to-token ratio used when tiktoken is unavailable. |
+| `retrieval.token_overhead` | `RAG_TOKEN_OVERHEAD` | Reserve this many tokens to keep room for prompts and user input. |
+| `retrieval.min_score` | `RAG_MIN_SCORE` | Discard retrieved chunks whose similarity falls below this threshold. |
+| `retrieval.rerank_top_k` | `RAG_RERANK_TOP_K` | Re-embed and rerank the top-N chunks for better precision. |
+| `retrieval.context_separator` | `RAG_CONTEXT_SEPARATOR` | Separator inserted between retrieved chunks. |
 | `llm.provider` | `LLM_PROVIDER` | Choose `ollama` or `openai`. |
 | `llm.default_model` | `LLM_MODEL` | Default model to preselect for the chosen provider. |
 | `ollama.host` | `OLLAMA_HOST` | Base URL of the Ollama HTTP API. |
@@ -193,6 +205,13 @@ Diagnostic scripts help verify the ingestion results:
 - `python inspect_neighbors.py` – sample chunks and list their nearest neighbours.
 - `python visualize_tsne.py` – launch a t-SNE plot (opens a Matplotlib window).
 - `python rag_query_example.py` – run a plain retrieval query without invoking an LLM.
+
+Additional CLI switches expose the new retrieval optimisations:
+
+- `--max-context-tokens`: enforce a model-aware token budget.
+- `--token-encoder`: select the tokenizer used for estimation (falls back to heuristics when missing).
+- `--min-score`: drop low-similarity results before building the context.
+- `--rerank-top-k`: re-embed and rerank the top-N hits to prioritise high-confidence chunks.
 
 All scripts rely on the shared configuration, so you can point them at alternative index
 locations with the same flags used by the main CLIs.

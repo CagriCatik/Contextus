@@ -47,6 +47,7 @@ from .store import (
 )
 from .chat import ChatSession
 from .docgen import TestCase, TestSpecGenerator
+from .tokenization import TokenCounter
 
 __all__ = [
     "AppConfig",
@@ -92,4 +93,5 @@ __all__ = [
     "ChatSession",
     "TestCase",
     "TestSpecGenerator",
+    "TokenCounter",
 ]

@@ -102,6 +102,13 @@ class RetrievalConfig:
 
     top_k: int = 5
     max_context_chars: int = 4000
+    max_context_tokens: int | None = None
+    token_encoder: str | None = None
+    fallback_chars_per_token: float = 4.0
+    token_overhead: int = 0
+    min_score: float | None = None
+    rerank_top_k: int = 0
+    context_separator: str = "\n\n---\n\n"
 
 
 @dataclass
@@ -273,6 +280,27 @@ class AppConfig:
         max_context = _env("RAG_MAX_CONTEXT_CHARS")
         if max_context:
             self.retrieval.max_context_chars = int(max_context)
+        max_tokens = _env("RAG_MAX_CONTEXT_TOKENS")
+        if max_tokens:
+            self.retrieval.max_context_tokens = int(max_tokens)
+        token_encoder = _env("RAG_TOKEN_ENCODER")
+        if token_encoder:
+            self.retrieval.token_encoder = token_encoder
+        fallback_ratio = _env("RAG_FALLBACK_CHARS_PER_TOKEN")
+        if fallback_ratio:
+            self.retrieval.fallback_chars_per_token = float(fallback_ratio)
+        token_overhead = _env("RAG_TOKEN_OVERHEAD")
+        if token_overhead:
+            self.retrieval.token_overhead = int(token_overhead)
+        min_score = _env("RAG_MIN_SCORE")
+        if min_score:
+            self.retrieval.min_score = float(min_score)
+        rerank_top_k = _env("RAG_RERANK_TOP_K")
+        if rerank_top_k:
+            self.retrieval.rerank_top_k = int(rerank_top_k)
+        separator = _env("RAG_CONTEXT_SEPARATOR")
+        if separator:
+            self.retrieval.context_separator = separator
 
         ollama_host = _env("OLLAMA_HOST")
         if ollama_host:

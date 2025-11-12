@@ -21,6 +21,11 @@ chunking:
 retrieval:
   top_k: 5
   max_context_chars: 4000
+  max_context_tokens: 1200
+  token_encoder: cl100k_base
+  token_overhead: 200
+  min_score: 0.2
+  rerank_top_k: 8
 
 vector_store:
   backend: faiss

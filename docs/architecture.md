@@ -1,6 +1,8 @@
 # RAG Stack Architecture Guide
 
-This document captures the structure, data flow, and extensibility points of the RAG Stack project. It is intended for engineers who need to understand how ingestion, retrieval, large language model (LLM) integration, and documentation generation are orchestrated across the codebase.
+This guide explains how Contextus implements retrieval-augmented generation (RAG) across ingestion, storage, and
+large-language-model (LLM) orchestration layers. It highlights control flow, data dependencies, and the extension points that
+allow different retrievers, vector stores, and chat providers to plug into the system.
 
 ## High-Level Component View
 
@@ -43,16 +45,20 @@ flowchart LR
     embed --> retrieve
 ```
 
-The CLIs are thin entry points that parse overrides, load configuration, and compose the reusable classes living in `ragstack/`. Provider-specific integrations (Ollama and OpenAI) implement a shared protocol so the chat and documentation workflows remain provider-agnostic.
+Each CLI is a thin adapter that parses overrides, loads configuration, and composes the reusable classes living in
+`ragstack/`. Provider-specific integrations (Ollama and OpenAI) implement a shared protocol so chat and documentation
+workflows remain provider-agnostic.
 
 ## Configuration System
 
-Configuration is centralised in `ragstack/config.py`, which exposes dataclasses for corpus discovery, embeddings, chunking, retrieval, vector store selection, provider credentials, prompts, and documentation settings. `AppConfig.load()` merges:
+Configuration is centralised in `ragstack/config.py`, which exposes dataclasses for corpus discovery, embeddings,
+chunking, retrieval, vector store selection, provider credentials, prompts, and documentation settings. `AppConfig.load()`
+performs the following merge order:
 
 1. Defaults baked into the dataclasses.
 2. Overrides from `config.yaml` (or `config.json` for backwards compatibility).
 3. Environment variables (optionally sourced from `.env` via `dotenv`).
-4. Task profiles defined in the `tasks:` section, which can override retrieval and prompt fields per downstream use case.
+4. Task profiles defined under `tasks:` that selectively override retrieval and prompt fields.
 
 ```mermaid
 sequenceDiagram
@@ -71,18 +77,25 @@ sequenceDiagram
     AppCfg-->>CLI: RetrievalConfig + PromptConfig
 ```
 
-### Task Profiles
+### Task Profiles and Runtime Overrides
 
-Task profiles are named configurations that modify retrieval and prompt behaviour without duplicating entire config files. Each profile is turned into a `TaskProfile` object, and `AppConfig.resolve_task()` materialises the merged `RetrievalConfig` and `PromptConfig`. This mechanism powers the `--task` flag exposed by both `chat_cli.py` and `generate_test_spec.py`.
+Task profiles are named configurations that tweak retrieval or prompt behaviour without duplicating entire config files.
+`AppConfig.resolve_task()` materialises the merged `RetrievalConfig` and `PromptConfig`, enabling CLIs to expose a `--task`
+flag for persona-specific behaviour. Environment variables further override configuration at load time, allowing deployments
+to change embedding models, device selection, retrieval depth, or provider credentials without editing YAML. The loader reads
+a single `.env` file on first use to avoid repeated filesystem access in long-running processes.
 
 ## Ingestion Pipeline
 
-`ingest_markdown.py` drives the ingestion workflow. It instantiates an `IndexBuilder`, which performs the following steps:
+`ingest_markdown.py` orchestrates offline ingestion. It instantiates an `IndexBuilder`, which executes:
 
-1. `MarkdownCorpus.build()` enumerates documents under `config.paths.data_dir`, applies include/exclude globbing, optionally converts non-markdown formats via MarkItDown, strips markdown syntax, and yields overlapping chunks using `text.Chunker`.
-2. `create_embeddings()` constructs the configured embedding backend (default: `SentenceTransformerEmbeddings`). Devices are auto-detected (`cuda`, `mps`, or `cpu`) unless overridden.
+1. `MarkdownCorpus.build()` enumerates documents under `config.paths.data_dir`, applies include/exclude globbing, optionally
+   converts non-markdown formats via MarkItDown, strips markdown syntax, and yields overlapping chunks using `text.Chunker`.
+2. `create_embeddings()` constructs the configured embedding backend (default: `SentenceTransformerEmbeddings`). Devices are
+   auto-detected (`cuda`, `mps`, or `cpu`) unless overridden.
 3. `EmbeddingBackend.embed_documents()` generates normalised embeddings for each chunk.
-4. `create_vector_store()` instantiates the configured vector store backend (default: `FaissVectorStore`). The store persists vectors to `<index_name>.faiss` and metadata to `<index_name>_meta.json`.
+4. `create_vector_store()` instantiates the vector store backend (default: `FaissVectorStore`). The store persists vectors to
+   `<index_name>.faiss` and metadata to `<index_name>_meta.json`.
 5. The index is saved, returning `IngestionStats` with document, chunk, and dimension counts.
 
 ```mermaid
@@ -95,20 +108,40 @@ flowchart TD
 
 ## Retrieval & Context Building
 
-`ragstack/retrieval.py` wraps the vector store and embeddings to produce formatted context blocks for prompts:
+`ragstack/retrieval.py` converts the vector store into prompt-ready context blocks:
 
-- `ContextBuilder.retrieve()` embeds a query and performs `store.search()` to obtain the top-K `VectorRecord` hits.
-- Each hit is rendered as `[source: path#chunk | score: N.NNN]` plus the chunk text, and the blocks are concatenated with `---` separators up to a configurable character budget.
+- `ContextBuilder.retrieve()` embeds a query, optionally re-embeds the top-N hits for reranking, and filters out low-scoring
+  results before returning `VectorRecord` matches.
+- Each hit is rendered as `[source: path#chunk | score: N.NNN]` plus the chunk text, concatenated with configurable
+  separators.
+- `ContextBuilder.build_context()` streams formatted chunks while respecting both character and token budgets, truncating the
+  final chunk if needed to honour the configured limits.
 
-This retrieval path is shared by chat and documentation generation, ensuring both consumers are grounded in the same indexed corpus.
+This retrieval path is shared by chat and documentation generation, ensuring all downstream consumers are grounded in the
+same indexed corpus.
+
+### Context Window Management Strategies
+
+- **Character Budgets:** `retrieval.max_context_chars` caps the assembled context string, providing a lightweight guardrail for
+  LLM context windows regardless of provider limits.
+- **Token Budgets:** `retrieval.max_context_tokens` pairs the character guardrail with tokenizer-aware estimates. The
+  `TokenCounter` utility uses tiktoken when available (or a configurable char-per-token heuristic) and subtracts
+  `retrieval.token_overhead` to reserve room for prompts and user turns.
+- **Score Thresholds:** `retrieval.min_score` drops low-confidence chunks, keeping the remaining budget focused on relevant
+  passages.
+- **Reranking:** `retrieval.rerank_top_k` re-embeds the highest-ranking chunks and re-sorts them against the query vector to
+  improve alignment when the base FAISS scores are noisy.
+- **Task Profiles:** Profiles targeting long-form answers can increase `retrieval.top_k`, `max_context_chars`, or token budgets
+  to push more evidence into prompts.
 
 ## Chat Session Orchestration
 
 `ChatSession` coordinates retrieval and provider interaction:
 
-1. `ensure_model()` fetches the available models from the provider and prompts the user (via Rich tables/prompts) to choose one if not already configured.
+1. `ensure_model()` fetches the available models from the provider and prompts the user (via Rich tables or automatic selection
+   in non-interactive shells) to choose one if not already configured.
 2. Each user query triggers `ContextBuilder.build_context()` to gather relevant chunks.
-3. The session materialises chat messages from `PromptConfig` templates and calls `client.chat()` on the provider.
+3. The session materialises chat messages from `PromptConfig` templates and calls `client.chat()` on the configured provider.
 4. Responses are rendered using Rich Markdown panels for a polished console experience.
 
 ```mermaid
@@ -132,7 +165,7 @@ sequenceDiagram
 
 ## Documentation Generation Workflow
 
-`generate_test_spec.py` repurposes the same retrieval layer to produce structured test cases. `TestSpecGenerator.generate_test_case()`:
+`generate_test_spec.py` reuses the same retrieval layer to produce structured test cases. `TestSpecGenerator.generate_test_case()`:
 
 1. Formats a test case identifier using `DocumentationConfig` (e.g., `TC-001`).
 2. Retrieves requirement context with `ContextBuilder`.
@@ -143,10 +176,14 @@ This approach enables repeatable documentation that traces back to the same know
 
 ## Extensibility Hooks
 
-- **Embeddings:** Register custom backends with `ragstack.embedding.register_embedding_backend("name", CustomEmbeddingBackend)` provided the class subclasses `EmbeddingBackend` and implements `embed_documents()`.
-- **Vector Stores:** Implement the `VectorStore` abstract base class and register it with `ragstack.store.register_vector_store()`. Configuration can then set `vector_store.backend` to the registry key or dotted import path.
-- **Providers:** Any provider that satisfies the `SupportsModels` protocol (list models, ensure model, chat) can slot into `ChatSession` and `TestSpecGenerator`. Ollama and OpenAI are reference implementations.
-- **Task Profiles:** Define named override bundles under `tasks:` in `config.yaml` to tune retrieval depth, context budgets, or prompt templates per downstream use case.
+- **Embeddings:** Register custom backends with `ragstack.embedding.register_embedding_backend("name", CustomEmbeddingBackend)`
+  provided the class subclasses `EmbeddingBackend` and implements `embed_documents()`.
+- **Vector Stores:** Implement the `VectorStore` abstract base class and register it with `ragstack.store.register_vector_store()`.
+  Configuration can then set `vector_store.backend` to the registry key or dotted import path.
+- **Providers:** Any provider that satisfies the `SupportsModels` protocol (list models, ensure model, chat) can slot into
+  `ChatSession` and documentation tooling. Ollama and OpenAI are reference implementations.
+- **Task Profiles:** Define named override bundles under `tasks:` in `config.yaml` to tune retrieval depth, context budgets, or
+  prompt templates per downstream use case.
 
 ## Supporting Utilities
 
@@ -157,13 +194,3 @@ Several helper scripts provide diagnostics and visualisation:
 - `visualize_tsne.py` projects embeddings to 2D with t-SNE for exploratory analysis.
 
 These utilities share the same `AppConfig` loading mechanism and benefit from the Rich console for readable output.
-
-## Operational Considerations
-
-- **GPU Usage:** Embedding device selection honours `config.yaml`, environment variables, and CLI overrides. Auto-detection falls back to CPU if CUDA/MPS are unavailable.
-- **Index Integrity:** FAISS metadata is persisted separately; load-time warnings highlight mismatches so chat/docgen flows can continue even when legacy indexes have incomplete metadata.
-- **Secrets Management:** `.env` files (or environment variables) must provide `OPENAI_API_KEY` before the OpenAI client can initialise. Ollama host/timeout are likewise configurable via env or CLI flags.
-
----
-
-With this architecture map, contributors can trace how data moves from raw documents to interactive chat responses and generated documentation, and where to extend or swap components to suit their deployment.
