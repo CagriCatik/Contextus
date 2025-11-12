@@ -1,0 +1,73 @@
+corpus:
+  include:
+    - "**/*.md"
+    - "**/*.mdx"
+    - "**/*.txt"
+    - "**/*.pdf"
+  exclude:
+    - "**/.ipynb_checkpoints/**"
+  use_markitdown: true
+
+embeddings:
+  backend: sentence_transformer
+  model_name: sentence-transformers/all-MiniLM-L6-v2
+  device: auto
+
+chunking:
+  max_chars: 800
+  min_chars: 200
+  overlap: 100
+
+retrieval:
+  top_k: 5
+  max_context_chars: 4000
+
+vector_store:
+  backend: faiss
+  parameters: {}
+
+llm:
+  provider: ollama
+  default_model: llama3.2:latest
+
+ollama:
+  host: http://localhost:11434
+  timeout: 120
+
+openai:
+  model: gpt-4o-mini
+  base_url: https://api.openai.com/v1
+
+prompts:
+  system_prompt: >-
+    You are a focused assistant that answers using the retrieved knowledge base context.
+    If the context is insufficient, admit it and suggest follow-up ingestion steps when appropriate.
+  context_template: |-
+    Here is the retrieved context from the knowledge base:
+
+    {context}
+
+    When answering, cite the relevant [source: ...] blocks if needed.
+  question_template: "User question: {query}"
+  
+documentation:
+  test_case_id_prefix: TC-
+  starting_index: 1
+  system_prompt: >-
+    You are a senior QA engineer who writes thorough and actionable test specifications.
+    Use the supplied requirements context to derive precise test cases and reference every
+    requirement you rely on.
+
+tasks:
+  default:
+    retrieval:
+      top_k: 5
+      max_context_chars: 4000
+  long_form_answering:
+    retrieval:
+      top_k: 8
+      max_context_chars: 6000
+    prompts:
+      system_prompt: >-
+        You are an analytical assistant who writes exhaustive answers grounded in the provided context.
+        Explicitly cite the most relevant sources and mention when information is missing.
