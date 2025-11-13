@@ -1,23 +1,43 @@
-# Contextus
+<div align="center">
+  <h1>Contextus</h1>
+</div>
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![RAG](https://img.shields.io/badge/RAG-modular%20stack-6E40C9)](https://github.com/CagriCatik/Contextus)
-[![FAISS](https://img.shields.io/badge/vector%20store-FAISS-009688)](https://github.com/facebookresearch/faiss)
-[![Embeddings](https://img.shields.io/badge/embeddings-SentenceTransformers-FF6F00)](https://www.sbert.net/)
-[![Ollama](https://img.shields.io/badge/inference-Ollama-000000?logo=ollama)](https://ollama.com)
-[![OpenAI](https://img.shields.io/badge/inference-OpenAI-412991?logo=openai&logoColor=white)](https://platform.openai.com/)
-[![Issues](https://img.shields.io/github/issues/CagriCatik/Contextus)](https://github.com/CagriCatik/Contextus/issues)
-[![Last commit](https://img.shields.io/github/last-commit/CagriCatik/Contextus)](https://github.com/CagriCatik/Contextus/commits/main)
+<p align="center">
+  <a href="https://www.python.org/downloads/">
+    <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" />
+  </a>
+  <a href="https://github.com/CagriCatik/Contextus">
+    <img src="https://img.shields.io/badge/RAG-modular%20stack-6E40C9" />
+  </a>
+  <a href="https://github.com/facebookresearch/faiss">
+    <img src="https://img.shields.io/badge/vector%20store-FAISS-009688" />
+  </a>
+  <a href="https://www.sbert.net/">
+    <img src="https://img.shields.io/badge/embeddings-SentenceTransformers-FF6F00" />
+  </a>
+  <a href="https://ollama.com">
+    <img src="https://img.shields.io/badge/inference-Ollama-000000?logo=ollama" />
+  </a>
+  <a href="https://platform.openai.com/">
+    <img src="https://img.shields.io/badge/inference-OpenAI-412991?logo=openai&logoColor=white" />
+  </a>
+  <a href="https://github.com/CagriCatik/Contextus/issues">
+    <img src="https://img.shields.io/github/issues/CagriCatik/Contextus" />
+  </a>
+  <a href="https://github.com/CagriCatik/Contextus/commits/main">
+    <img src="https://img.shields.io/github/last-commit/CagriCatik/Contextus" />
+  </a>
+</p>
 
-> Contextus is a modular retrieval-augmented generation stack for grounded question answering over local document collections.
+> Contextus is a modular retrieval-augmented generation stack for grounded question answering over local document collections. It is delivered as a console application, providing a command-line driven workflow for ingestion, retrieval, and generation.
 
 It separates the workflow into:
 
-1. **Ingestion** – use [MarkItDown](https://github.com/openai/markitdown) to normalise heterogeneous documents to Markdown/plain text, split them into overlapping chunks, embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.
+1. **Ingestion** – use MarkItDown to normalise heterogeneous documents to Markdown/plain text, split them into overlapping chunks, embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.
 2. **Retrieval** – efficiently locate the most relevant chunks for a user question.
-3. **Generation** – call either a locally hosted [Ollama](https://ollama.com) model or an [OpenAI](https://platform.openai.com) chat model with the retrieved context to produce grounded answers.
+3. **Generation** – call either a locally hosted Ollama model or an OpenAI chat model with the retrieved context to produce grounded answers.
 
-All moving pieces live in the `ragstack/` package so configuration, ingestion, and chat experiences stay modular and testable.
+All moving pieces live in the ragstack/ package so configuration, ingestion, and chat experiences stay modular and testable.
 
 ---
 
