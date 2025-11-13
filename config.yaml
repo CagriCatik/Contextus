@@ -28,11 +28,11 @@ vector_store:
 
 llm:
   provider: ollama
-  default_model: llama3.2:latest
+  default_model: deepseek-r1:1.5b
 
 ollama:
   host: http://localhost:11434
-  timeout: 120
+  timeout: 180
 
 openai:
   model: gpt-4o-mini
@@ -50,14 +50,6 @@ prompts:
     When answering, cite the relevant [source: ...] blocks if needed.
   question_template: "User question: {query}"
   
-documentation:
-  test_case_id_prefix: TC-
-  starting_index: 1
-  system_prompt: >-
-    You are a senior QA engineer who writes thorough and actionable test specifications.
-    Use the supplied requirements context to derive precise test cases and reference every
-    requirement you rely on.
-
 tasks:
   default:
     retrieval:

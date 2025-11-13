@@ -1,4 +1,4 @@
-# RAG Stack Architecture Guide
+# Contextus Architecture
 
 This document captures the structure, data flow, and extensibility points of the RAG Stack project. It is intended for engineers who need to understand how ingestion, retrieval, large language model (LLM) integration, and documentation generation are orchestrated across the codebase.
 

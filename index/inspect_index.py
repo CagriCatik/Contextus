@@ -260,5 +260,5 @@ def main() -> None:
     check_metadata_consistency(store, index)
 
 
-if __name__ == "__main__":  # pragma: no cover - diagnostic script
+if __name__ == "__main__": 
     main()

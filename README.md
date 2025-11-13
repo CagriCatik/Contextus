@@ -6,8 +6,6 @@
 [![Embeddings](https://img.shields.io/badge/embeddings-SentenceTransformers-FF6F00)](https://www.sbert.net/)
 [![Ollama](https://img.shields.io/badge/inference-Ollama-000000?logo=ollama)](https://ollama.com)
 [![OpenAI](https://img.shields.io/badge/inference-OpenAI-412991?logo=openai&logoColor=white)](https://platform.openai.com/)
-[![Type hints](https://img.shields.io/badge/type%20hints-mypy-informational)](https://mypy-lang.org/)
-[![Pre-commit](https://img.shields.io/badge/hooks-pre--commit-FAB040?logo=pre-commit)](https://pre-commit.com/)
 [![Issues](https://img.shields.io/github/issues/CagriCatik/Contextus)](https://github.com/CagriCatik/Contextus/issues)
 [![Last commit](https://img.shields.io/github/last-commit/CagriCatik/Contextus)](https://github.com/CagriCatik/Contextus/commits/main)
 
@@ -15,16 +13,11 @@
 
 It separates the workflow into:
 
-1. **Ingestion** – use [MarkItDown](https://github.com/openai/markitdown) to normalise
-   heterogeneous documents to Markdown/plain text, split them into overlapping chunks,
-   embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.
+1. **Ingestion** – use [MarkItDown](https://github.com/openai/markitdown) to normalise heterogeneous documents to Markdown/plain text, split them into overlapping chunks, embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.
 2. **Retrieval** – efficiently locate the most relevant chunks for a user question.
-3. **Generation** – call either a locally hosted [Ollama](https://ollama.com) model or an
-   [OpenAI](https://platform.openai.com) chat model with the retrieved context to produce
-   grounded answers.
+3. **Generation** – call either a locally hosted [Ollama](https://ollama.com) model or an [OpenAI](https://platform.openai.com) chat model with the retrieved context to produce grounded answers.
 
-All moving pieces live in the `ragstack/` package so configuration, ingestion, and chat
-experiences stay modular and testable.
+All moving pieces live in the `ragstack/` package so configuration, ingestion, and chat experiences stay modular and testable.
 
 ---
 
@@ -64,13 +57,11 @@ OPENAI_API_KEY=sk-your-openai-key
 ├── ingest_markdown.py     # Build the FAISS index from local documents via MarkItDown
 ├── chat_cli.py            # Interactive chat client with provider/model discovery
 ├── rag_core.py            # Thin wrapper around the retrieval stack
-├── rag_query_example.py   # Run retrieval without a chat model
 ├── data/                  # Place documents here (Markdown, PDFs, text… auto-created)
 └── index/                 # Persisted FAISS index and metadata (auto-created)
 ```
 
-The public API is exposed through `ragstack/__init__.py`, making it easy to integrate the
-components into other projects or notebooks.
+The public API is exposed through `ragstack/__init__.py`, making it easy to integrate the components into other projects or notebooks.
 
 ---
 
@@ -102,7 +93,7 @@ retrieval:
   max_context_chars: 4000
 llm:
   provider: ollama
-  default_model: llama3.2:latest
+  default_model: deepseek-r1:1.5b
 ollama:
   host: http://localhost:11434
   timeout: 30
@@ -142,25 +133,18 @@ Key overrides and their environment variables:
 | `openai.model` | `OPENAI_MODEL` | OpenAI chat model (e.g. `gpt-4o-mini`). |
 | `openai.base_url` | `OPENAI_BASE_URL` | Custom endpoint for compatible OpenAI deployments. |
 | `prompts.*` | `SYSTEM_PROMPT`, `CONTEXT_TEMPLATE`, `QUESTION_TEMPLATE` | Customise the chat prompt templates. |
-| `documentation.system_prompt` | `TEST_SPEC_SYSTEM_PROMPT` | System instruction used when creating test specs. |
 
-You can point the CLI to alternative configuration files with `--config-file` or to a
-different `.env` via `--env-file`.
+You can point the CLI to alternative configuration files with `--config-file` or to a different `.env` via `--env-file`.
 
 ---
 
 ## 4. Vectorise your documents
 
-1. Copy or symlink all supported sources into the `data/` directory (or provide `--data-dir`
-   to the ingestion CLI). By default MarkItDown handles Markdown, MDX, plain text, and PDFs;
-   extend the `corpus.include` globs for other formats.
+1. Copy or symlink all supported sources into the `data/` directory (or provide `--data-dir` to the ingestion CLI). By default MarkItDown handles Markdown, MDX, plain text, and PDFs; extend the `corpus.include` globs for other formats.
 2. Run the ingestion pipeline:
 
    ```bash
-   python ingest_markdown.py \
-       --data-dir ./data \
-       --index-dir ./index \
-       --index-name markdown_rag
+   python ingest_markdown.py --data-dir ./data --index-dir ./index --index-name markdown_rag
    ```
 
    Optional overrides:
@@ -192,7 +176,6 @@ Diagnostic scripts help verify the ingestion results:
 - `python inspect_index.py` – print index statistics and sample metadata rows.
 - `python inspect_neighbors.py` – sample chunks and list their nearest neighbours.
 - `python visualize_tsne.py` – launch a t-SNE plot (opens a Matplotlib window).
-- `python rag_query_example.py` – run a plain retrieval query without invoking an LLM.
 
 All scripts rely on the shared configuration, so you can point them at alternative index
 locations with the same flags used by the main CLIs.
@@ -215,37 +198,26 @@ python chat_cli.py --provider openai --list-models
 
 ```bash
 # Local Ollama example
-python chat_cli.py \
-    --model llama3.2:latest \
-    --embedding-device cuda \
-    --top-k 6 \
-    --max-context-chars 3500
+python chat_cli.py --index-dir ./index --index-name markdown_rag --provider ollama --model deepseek-r1:1.5b
 
 # Hosted OpenAI example
-python chat_cli.py \
-    --provider openai \
-    --model gpt-4o-mini
+python chat_cli.py --provider openai --model gpt-4o-mini
 ```
 
 **Highlights:**
 
-- When `--model` is omitted the CLI lists available models and prompts for a choice (the
-  first model is auto-selected for non-interactive shells).
+- When `--model` is omitted the CLI lists available models and prompts for a choice (the first model is auto-selected for non-interactive shells).
 - `--host` and `--timeout` override Ollama connectivity details; OpenAI uses `.env`.
-- Retrieval depth and context size can be tuned per run via `--top-k` and
-  `--max-context-chars`.
+- Retrieval depth and context size can be tuned per run via `--top-k` and `--max-context-chars`.
 - Swap prompt + retrieval presets with `--task <profile>` to load overrides from `config.yaml`.
-- Override embedding placement on the fly with `--embedding-device` (defaults to
-  the configuration / auto-detection).
-- The CLI is powered by [Rich](https://rich.readthedocs.io/), so model discovery,
-  status messages, and responses render with colourful tables and panels.
-- Customise system, context, and question prompts directly in `config.yaml` or via
-  environment variables without touching code.
+- Override embedding placement on the fly with `--embedding-device` (defaults to the configuration / auto-detection).
+- The CLI is powered by [Rich](https://rich.readthedocs.io/), so model discovery, status messages, and responses render with colourful tables and panels.
+- Customise system, context, and question prompts directly in `config.yaml` or via environment variables without touching code.
 
 **Example conversation (Ollama provider):**
 
 ```bash
-$ python chat_cli.py --model llama3.2:latest
+$ python chat_cli.py --index-dir ./index --index-name markdown_rag --provider ollama --model deepseek-r1:1.5b
 ────────────── RAG chat session. Press Enter on an empty line or Ctrl+D to exit. ──────────────
 
 [prompt]You:[/prompt] What does the ingestion pipeline do?
@@ -259,8 +231,7 @@ $ python chat_cli.py --model llama3.2:latest
 ╰─────────────╯
 ```
 
-Provider errors (missing models, authentication problems, connectivity) are surfaced as
-actionable messages instead of raw stack traces.
+Provider errors (missing models, authentication problems, connectivity) are surfaced as actionable messages instead of raw stack traces.
 
 ---
 
