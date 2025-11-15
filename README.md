@@ -46,7 +46,7 @@
 
   </td>
     <td>
-      <img src="assets/screenshot.png" width="640" />
+      <img src="assets/screenshot.png" width="1200" />
     </td>
   </tr>
 </table>
