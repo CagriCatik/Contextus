@@ -29,13 +29,14 @@
   </a>
 </p>
 
-<div style="display:flex; align-items:flex-start; gap:20px;">
+<div style="display:flex; align-items:flex-start; gap:32px;">
 
   <div style="flex:1;">
-    <p>Contextus is a modular retrieval-augmented generation stack for grounded question answering over local document collections. It is delivered as a console application, providing a command-line driven workflow for ingestion, retrieval, and generation.</p>
 
-  <p>It separates the workflow into:
+  <p>Contextus is a modular retrieval-augmented generation stack for grounded question answering over local document collections. It is delivered as a console application, providing a command-line driven workflow for ingestion, retrieval, and generation.
   </p>
+
+  <p>It separates the workflow into:</p>
 
   <ol>
     <li><strong>Ingestion</strong> -- use MarkItDown to normalise heterogeneous documents to Markdown/plain text, split them into overlapping chunks, embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.</li>
@@ -44,10 +45,11 @@
   </ol>
 
   <p>All moving pieces live in the ragstack/ package so configuration, ingestion, and chat experiences stay modular and testable.</p>
-</div>
+
+  </div>
 
   <div style="flex:0 0 auto;">
-    <img src="assets/screenshot.png" style="width:300px; height:auto;">
+    <img src="assets/screenshot.png" style="width:360px; height:auto;">
   </div>
 
 </div>
