@@ -37,9 +37,9 @@
   <p>It separates the workflow into:</p>
 
   <ol>
-        <li><strong>Ingestion</strong> -- use MarkItDown to normalise heterogeneous documents to Markdown/plain text, split them into overlapping chunks, embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.</li>
-        <li><strong>Retrieval</strong> -- efficiently locate the most relevant chunks for a user question.</li>
-        <li><strong>Generation</strong> -- call either a locally hosted Ollama model or an OpenAI chat model with the retrieved context to produce grounded answers.</li>
+        <li><strong>Ingestion</strong> → use MarkItDown to normalise heterogeneous documents to Markdown/plain text, split them into overlapping chunks, embed each chunk with SentenceTransformers, and persist the vectors inside FAISS.</li>
+        <li><strong>Retrieval</strong> → efficiently locate the most relevant chunks for a user question.</li>
+        <li><strong>Generation</strong> → call either a locally hosted Ollama model or an OpenAI chat model with the retrieved context to produce grounded answers.</li>
       </ol>
 
   <p>All moving pieces live in the ragstack/ package so configuration, ingestion, and chat experiences stay modular and testable.</p>
