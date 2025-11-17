@@ -27,7 +27,11 @@
   <a href="https://github.com/CagriCatik/Contextus/commits/main">
     <img src="https://img.shields.io/github/last-commit/CagriCatik/Contextus" />
   </a>
+  <a href="https://deepwiki.com/CagriCatik/Contextus">
+    <img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki" />
+  </a>
 </p>
+
 
 <table>
   <tr>
